@@ -1,0 +1,196 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  password   String?
+  name       String?
+  roleId     String?
+  role       Role?    @relation(fields: [roleId], references: [id])
+  provider   String   @default("local") // local, google
+  providerId String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  notifications Notification[]
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  users       User[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model RolePermission {
+  id         String   @id @default(uuid())
+  roleId     String
+  role       Role     @relation(fields: [roleId], references: [id])
+  moduleName String   // dashboard, products, customers, billing, pos, inventory, suppliers, purchases, reports, users
+  canView    Boolean  @default(false)
+  canCreate  Boolean  @default(false)
+  canEdit    Boolean  @default(false)
+  canDelete  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([roleId, moduleName])
+}
+
+model Product {
+  id                String   @id @default(uuid())
+  name              String
+  description       String?
+  price             Float
+  costPrice         Float    @default(0)
+  stockQuantity     Int      @default(0)
+  category          String?
+  brand             String?
+  unit              String?  @default("pcs") // pcs, kg, box, etc.
+  taxType           String?  @default("Exclusive") // Inclusive, Exclusive
+  hsnCode           String?
+  image             String?
+  sku               String?  @unique
+  barcode           String?  @unique
+  gstPercent        Float    @default(0)
+  minStockLevel     Int      @default(10)
+  supplierId        String?
+  supplier          Supplier? @relation(fields: [supplierId], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  movements         InventoryMovement[]
+}
+
+model Customer {
+  id        String    @id @default(uuid())
+  name      String
+  email     String?   @unique
+  phone     String?   @unique
+  address   String?
+  gstNumber String?
+  creditLimit Float?    @default(0)
+  loyaltyPoints Float    @default(0)
+  invoices  Invoice[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Invoice {
+  id          String        @id @default(uuid())
+  invoiceNumber String      @unique
+  customerId  String
+  customer    Customer      @relation(fields: [customerId], references: [id])
+  items          InvoiceItem[]
+  subtotal       Float         @default(0)
+  taxAmount      Float         @default(0)
+  discountPercent Float         @default(0)
+  totalAmount    Float
+  amountPaid     Float         @default(0)
+  dueAmount      Float         @default(0)
+  status         String        @default("unpaid") // draft, paid, unpaid, partial, overdue, cancelled
+  paymentMethod  String?       @default("cash") // cash, upi, card
+  dueDate        DateTime?
+  shopId         String?       @default("main-shop")
+  earnedPoints   Float         @default(0)
+  redeemedPoints Float         @default(0)
+  payments       Payment[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model InvoiceItem {
+  id        String   @id @default(uuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+  productId       String
+  name            String
+  quantity        Int
+  price           Float
+  costPrice       Float    @default(0)
+  discountPercent Float    @default(0)
+  taxAmount       Float    @default(0)
+  gstPercent      Float    @default(0)
+  total           Float
+}
+
+model Payment {
+  id            String   @id @default(uuid())
+  invoiceId     String
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id])
+  amount        Float
+  paymentMethod String
+  paymentDate   DateTime @default(now())
+  note          String?
+}
+
+model InventoryMovement {
+  id           String   @id @default(uuid())
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id])
+  movementType String   // SALE, PURCHASE, ADJUSTMENT
+  quantity     Int
+  referenceId  String?  // Invoice Number or Adjustment Note
+  createdAt    DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  message   String
+  type      String   @default("low_stock") // low_stock, system
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Supplier {
+  id             String    @id @default(uuid())
+  supplierName   String
+  contactPerson  String
+  phone          String
+  email          String?
+  address        String?
+  gstNumber      String?
+  status         String    @default("Active") // Active, Inactive
+  products       Product[]
+  purchases      Purchase[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Purchase {
+  id              String         @id @default(uuid())
+  purchaseNumber  String         @unique
+  supplierId      String
+  supplier        Supplier       @relation(fields: [supplierId], references: [id])
+  purchaseDate    DateTime       @default(now())
+  totalAmount     Float
+  status          String         @default("Pending") // Pending, Received, Cancelled
+  items           PurchaseItem[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model PurchaseItem {
+  id          String   @id @default(uuid())
+  purchaseId  String
+  purchase    Purchase @relation(fields: [purchaseId], references: [id])
+  productId   String
+  name        String
+  quantity    Int
+  price       Float
+  tax         Float
+  subtotal    Float
+}
